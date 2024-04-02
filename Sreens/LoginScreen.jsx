@@ -9,9 +9,20 @@ import React, {useEffect} from "react";
 import { Entypo } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialIcons } from '@expo/vector-icons';
-import * as Appauth from "expo-app-auth"
+import * as AuthSession from 'expo-auth-session';
 import { FontAwesome6 } from '@expo/vector-icons';
-import { useEffect } from "react";
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri, useAuthRequest } from 'expo-auth-session';
+
+
+WebBrowser.maybeCompleteAuthSession();
+
+// Endpoint
+const discovery = {
+  authorizationEndpoint: 'https://accounts.spotify.com/authorize',
+  tokenEndpoint: 'https://accounts.spotify.com/api/token',
+};
+
 
 
 
@@ -19,8 +30,8 @@ const LoginScreen = () => {
 
   useEffect( () => {
     const checkTokenValidity = async() => {
-      const accessToken = await AsyncStorage.getItem("token");
-      const expirationDate = await AsyncStorage.getItem("expirationDate");
+      const accessToken = await AuthSession.getItem("token");
+      const expirationDate = await AuthSession.getItem("expirationDate");
       console.log("accessToken", accessToken);
       console.log("expirationDate", expirationDate);
 
@@ -30,8 +41,8 @@ const LoginScreen = () => {
           navigation.replace("Main")
      } else{
       //token  has expired so remove it and navigate to login screen again
-      AsyncStorage.removeItem("token");
-      AsyncStorage.removeItem("expirationDate")
+      AuthSession.removeItem("token");
+      AuthSession.removeItem("expirationDate")
      }
     }
   }
@@ -39,30 +50,53 @@ const LoginScreen = () => {
 
   }, [])
 
-  async function authenticate ()  {
-    const config ={
-      issuer:"https:accounts.spotify.com",
-      clientId:"add5031d88c34296b1925b1b11b51239",
-      scopes:[
-        "user-read-email",
-        "user-library-read",
-        "user-read-recently-played",
-        "user-top-read",
-        "playlist-read-private",
-        "playlist-read-collaborative",
-        "playlist-modify-public"
-      ],
-      redirectUrl:"expo//localhost:9002/--/spotify-auth-callback"
+  const [request, response, promptAsync] = useAuthRequest(
+    {
+      clientId: 'add5031d88c34296b1925b1b11b51239',
+      scopes: ['user-read-email', 'playlist-modify-public'],
+      // To follow the "Authorization Code Flow" to fetch token after authorizationEndpoint
+      // this must be set to false
+      usePKCE: false,
+      redirectUri: makeRedirectUri({
+        scheme: 'spontify'
+        
+      }),
+      
+    },
+    discovery
+  );
+
+  React.useEffect(() => {
+    if (response?.type === 'success') {
+      const { code } = response.params;
     }
-    const result = await Appauth.authAsync(config);
-    console.log(result);
-    if (result.accessToken) {
-      const expirationDate  = new Date(result.accessTokenExpirationDate).getTime(); // convert today's date
-      AsyncStorage.setItem("token", result.accessToken);
-      AsyncStorage.setItem("expirationDate", expirationDate.toString() )
-      navigation.navigate("Main")
-    }
-  }
+  }, [response]);
+
+
+  // const  [request, response, promptAsync] = use ()  {
+  //   const config ={
+  //     issuer:"https:accounts.spotify.com",
+  //     clientId:"add5031d88c34296b1925b1b11b51239",
+  //     scopes:[
+  //       "user-read-email",
+  //       "user-library-read",
+  //       "user-read-recently-played",
+  //       "user-top-read",
+  //       "playlist-read-private",
+  //       "playlist-read-collaborative",
+  //       "playlist-modify-public"
+  //     ],
+  //     redirectUrl:"expo//localhost:9002/--/spotify-auth-callback"
+  //   }
+  //   const result = await AuthSession.authAsync(config);
+  //   console.log(result);
+  //   if (result.accessToken) {
+  //     const expirationDate  = new Date(result.accessTokenExpirationDate).getTime(); // convert today's date
+  //     AuthSession.setItem("token", result.accessToken);
+  //     AuthSession.setItem("expirationDate", expirationDate.toString() )
+  //     navigation.navigate("Main")
+  //   }
+  // }
 
   return (
     <LinearGradient colors={["#040306", "#131624"]} style={{ flex: 1 }}>
@@ -87,7 +121,9 @@ const LoginScreen = () => {
         </Text>
 
         <View style={{ height: 80 }} />
-        <TouchableOpacity activeOpacity={0.4} onPress={authenticate}
+        <TouchableOpacity activeOpacity={0.4}  onPress={() => {
+        promptAsync();
+      }}
           style={{
             backgroundColor: "#1D8954",
             borderRadius: 25,
